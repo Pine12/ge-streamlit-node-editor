@@ -47,6 +47,20 @@ result = node_editor(node_types=NODE_TYPES)
 st.write(result)
 ```
 
+## 🆕 Recent Enhancements
+
+*Contributed by [Graham E](mailto:grhmelliott@gmail.com)*
+
+- **Multi-select & bulk delete** — shift/ctrl/cmd-click to select multiple nodes, then remove them via a toolbar **DELETE** button or the Delete/Backspace key
+- **Auto-connect** — a toolbar **AUTO-CONNECT** button wires up compatible, unfilled ports left-to-right across the graph while detecting and skipping connections that would form a cycle
+- **Safer rewiring** — dropping a wire on an input that's already at its connection limit now warns before replacing or refuses with a toast message, instead of silently dropping the old connection
+- **Wire tooltip** — hovering a connection shows "Click to remove"
+- **Fixed editable node params** — select/text/number param fields previously couldn't be changed; edits now correctly update node state
+- **Larger port hit-areas** — ports have an enlarged, invisible buffer zone so wires snap into place without needing pixel-precise drops
+- **Custom numeric steppers** — replaced native number-input spinner arrows (which mis-render under SVG pan/zoom) with custom increment/decrement buttons
+- **No more accidental dragging** — interacting with dropdowns, text areas, and number inputs no longer drags the node underneath; dragging a node or wire no longer triggers ghost text-selection highlighting
+- **Reduced UI dimming** — node/graph updates are now debounced before being sent back to Streamlit, avoiding rerun-triggered dimming while dragging or typing
+
 ## 🛠️ Tech Stack
 
 - **React + TypeScript** — frontend component

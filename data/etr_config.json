@@ -1,0 +1,330 @@
+{
+    "port_mapping": {
+        "ANTICIPATING": {
+            "color": "#4ade80",
+            "label": "ANTICIPATING"
+        },
+        "MAPPING": {
+            "color": "#c084fc",
+            "label": "MAPPING"
+        },
+        "DEEPENING": {
+            "color": "#fb923c",
+            "label": "DEEPENING"
+        },
+        "TRANSFORMING": {
+            "color": "#facc15",
+            "label": "TRANSFORMING"
+        },
+        "MODEL": {
+            "color": "#f87171",
+            "label": "VAE"
+        },
+        "INT": {
+            "color": "#38bdf8",
+            "label": "INT"
+        },
+        "FLOAT": {
+            "color": "#818cf8",
+            "label": "FLOAT"
+        },
+        "STRING": {
+            "color": "#a8a29e",
+            "label": "STRING"
+        },
+        "MASK": {
+            "color": "#2dd4bf",
+            "label": "MASK"
+        },
+        "ANY": {
+            "color": "#71717a",
+            "label": "ANY"
+        }
+    },
+    "nodes": {
+        "Futures Triangle": {
+            "category": "Mapping",
+            "headerColor": "#fb923c",
+            "x": 60,
+            "y": 80,
+            "inputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                },
+                {
+                    "name": "Mapping",
+                    "type": "MAPPING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "ckpt_name",
+                    "label": "Checkpoint",
+                    "type": "select",
+                    "options": [
+                        "v1-5-pruned.ckpt",
+                        "sd_xl_base.safetensors"
+                    ]
+                }
+            ]
+        },
+        "Stakeholder Interviews": {
+            "category": "Mapping",
+            "headerColor": "#fb923c",
+            "x": 360,
+            "y": 60,
+            "inputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                },
+                {
+                    "name": "Mapping",
+                    "type": "MAPPING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "ckpt_name",
+                    "label": "Checkpoint",
+                    "type": "select",
+                    "options": [
+                        "v1-5-pruned.ckpt",
+                        "sd_xl_base.safetensors"
+                    ]
+                }
+            ]
+        },
+        "EIA": {
+            "category": "Anticipating",
+            "headerColor": "#facc15",
+            "x": 360,
+            "y": 240,
+            "inputs": [
+                {
+                    "name": "Mapping",
+                    "type": "MAPPING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                },
+                {
+                    "name": "Deepening",
+                    "type": "DEEPENING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "text",
+                    "label": "Prompt",
+                    "type": "textarea"
+                }
+            ]
+        },
+        "Futures Wheel": {
+            "category": "Anticipating",
+            "headerColor": "#facc15",
+            "x": 360,
+            "y": 440,
+            "inputs": [
+                {
+                    "name": "Mapping",
+                    "type": "MAPPING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Anticipating",
+                    "type": "ANTICIPATING"
+                },
+                {
+                    "name": "Deepening",
+                    "type": "DEEPENING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "text",
+                    "label": "Prompt",
+                    "type": "textarea"
+                }
+            ]
+        },
+        "Scenarios": {
+            "category": "Widening",
+            "headerColor": "#818cf8",
+            "x": 680,
+            "y": 200,
+            "inputs": [
+                {
+                    "name": "Deepening",
+                    "type": "DEEPENING",
+                    "maxConnections": 2
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Widening",
+                    "type": "WIDENING"
+                },
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "steps",
+                    "label": "Steps",
+                    "type": "int",
+                    "default": 20
+                },
+                {
+                    "key": "cfg",
+                    "label": "CFG",
+                    "type": "float",
+                    "default": 7
+                },
+                {
+                    "key": "sampler",
+                    "label": "Sampler",
+                    "type": "select",
+                    "options": [
+                        "euler",
+                        "euler_a",
+                        "dpm++2m",
+                        "ddim"
+                    ]
+                }
+            ]
+        },
+        "Change Progression": {
+            "category": "Widening",
+            "headerColor": "#818cf8",
+            "x": 1000,
+            "y": 300,
+            "inputs": [
+                {
+                    "name": "Deepening",
+                    "type": "DEEPENING",
+                    "maxConnections": 2
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Widening",
+                    "type": "WIDENING"
+                },
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "steps",
+                    "label": "Steps",
+                    "type": "int",
+                    "default": 20
+                },
+                {
+                    "key": "cfg",
+                    "label": "CFG",
+                    "type": "float",
+                    "default": 7
+                },
+                {
+                    "key": "sampler",
+                    "label": "Sampler",
+                    "type": "select",
+                    "options": [
+                        "euler",
+                        "euler_a",
+                        "dpm++2m",
+                        "ddim"
+                    ]
+                }
+            ]
+        },
+        "Wind Tunneling": {
+            "category": "Transforming",
+            "headerColor": "#c084fc",
+            "x": 1260,
+            "y": 320,
+            "inputs": [
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "width",
+                    "label": "Width",
+                    "type": "int",
+                    "default": 512
+                },
+                {
+                    "key": "height",
+                    "label": "Height",
+                    "type": "int",
+                    "default": 512
+                }
+            ]
+        },
+        "Backcasting": {
+            "category": "Transforming",
+            "headerColor": "#c084fc",
+            "x": 1440,
+            "y": 320,
+            "inputs": [
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "Transforming",
+                    "type": "TRANSFORMING"
+                }
+            ],
+            "params": [
+                {
+                    "key": "width",
+                    "label": "Width",
+                    "type": "int",
+                    "default": 512
+                },
+                {
+                    "key": "height",
+                    "label": "Height",
+                    "type": "int",
+                    "default": 512
+                }
+            ]
+        }
+    }
+}
