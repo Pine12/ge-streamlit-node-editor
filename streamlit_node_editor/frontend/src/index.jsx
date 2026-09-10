@@ -2,21 +2,22 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Streamlit } from "streamlit-component-lib";
 
 // ── Port type system (ComfyUI-style color coding) ─────────────────────────────
-const PORT_TYPES = {
-  IMAGE:   { color: "#4ade80", label: "IMAGE" },
-  LATENT:  { color: "#c084fc", label: "LATENT" },
-  MODEL:   { color: "#fb923c", label: "MODEL" },
-  CLIP:    { color: "#facc15", label: "CLIP" },
-  VAE:     { color: "#f87171", label: "VAE" },
-  INT:     { color: "#38bdf8", label: "INT" },
-  FLOAT:   { color: "#818cf8", label: "FLOAT" },
-  STRING:  { color: "#a8a29e", label: "STRING" },
-  MASK:    { color: "#2dd4bf", label: "MASK" },
-  ANY:     { color: "#71717a", label: "ANY" },
-};
+let PORT_TYPES = {};
+// var PORT_TYPES = {
+//   IMAGE:   { color: "#4ade80", label: "IMAGE" },
+//   LATENT:  { color: "#c084fc", label: "LATENT" },
+//   MODEL:   { color: "#fb923c", label: "MODEL" },
+//   CLIP:    { color: "#facc15", label: "CLIP" },
+//   VAE:     { color: "#f87171", label: "VAE" },
+//   INT:     { color: "#38bdf8", label: "INT" },
+//   FLOAT:   { color: "#818cf8", label: "FLOAT" },
+//   STRING:  { color: "#a8a29e", label: "STRING" },
+//   MASK:    { color: "#2dd4bf", label: "MASK" },
+//   ANY:     { color: "#71717a", label: "ANY" },
+// };
 
 // ── Node definitions (the "palette") ──────────────────────────────────────────
-const NODE_DEFS = {
+let NODE_DEFS = {
   "Load Checkpoint": {
     category: "Loaders",
     color: "#1e293b",
@@ -117,14 +118,18 @@ const NODE_DEFS = {
 let _id = 1;
 const uid = () => `node_${_id++}`;
 
-function makeNode(type, x, y) {
-  const def = NODE_DEFS[type];
+function makeNode(type, x, y, paramValues = {}) {
+  const def = NODE_DEFS[type] || { params: [] };
+  const defaultParams = Object.fromEntries(
+    (def.params || []).map(p => [p.key, p.default ?? ""])
+  );
   return {
     id: uid(),
     type,
     x, y,
     width: 240,
-    params: Object.fromEntries((def.params || []).map(p => [p.key, p.default ?? ""])),
+    // merge defaults with any provided values
+    params: { ...defaultParams, ...(paramValues || {}) },
     collapsed: false,
   };
 }
@@ -149,6 +154,11 @@ function typesCompatible(a, b) {
   return a === b;
 }
 
+function inputMaxConnections(nodeType, portIndex) {
+  const port = (NODE_DEFS[nodeType]?.inputs || [])[portIndex];
+  return port?.maxConnections ?? 1;
+}
+
 // ── Wire SVG path (cubic bezier) ─────────────────────────────────────────────
 function wirePath(x1, y1, x2, y2) {
   const dx = Math.abs(x2 - x1) * 0.6 + 60;
@@ -157,7 +167,7 @@ function wirePath(x1, y1, x2, y2) {
 
 // ── Node component ─────────────────────────────────────────────────────────────
 function GraphNode({ node, selected, wiring, onSelect, onDragStart,
-  onPortMouseDown, onPortMouseUp, connections }) {
+  onPortMouseDown, onPortMouseUp, onParamChange, connections }) {
   const def = NODE_DEFS[node.type];
   const h = nodeHeight(node);
 
@@ -166,7 +176,7 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
 
   return (
     <g transform={`translate(${node.x},${node.y})`}
-      onMouseDown={e => { e.stopPropagation(); onDragStart(e, node.id); onSelect(node.id); }}>
+      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDragStart(e, node.id); onSelect(node.id); }}>
 
       {/* Shadow */}
       <rect x={3} y={3} width={node.width} height={h} rx={8}
@@ -204,11 +214,15 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
             const isConn = connectedInputs.has(i);
             return (
               <g key={`in-${i}`}>
-                <circle cx={-1} cy={relY} r={5.5}
-                  fill={isConn ? c : "#13131f"} stroke={c} strokeWidth={2}
+                <circle cx={-1} cy={relY} r={14}
+                  fill="transparent"
                   style={{ cursor: "crosshair" }}
                   onMouseDown={e => { e.stopPropagation(); onPortMouseDown(e, node.id, "input", i, port.type); }}
                   onMouseUp={e => { e.stopPropagation(); onPortMouseUp(e, node.id, "input", i, port.type); }}
+                />
+                <circle cx={-1} cy={relY} r={5.5}
+                  fill={isConn ? c : "#13131f"} stroke={c} strokeWidth={2}
+                  style={{ pointerEvents: "none" }}
                 />
                 <text x={14} y={relY + 4} fontFamily="'Fira Code', monospace"
                   fontSize={10} fill={c} style={{ userSelect: "none", pointerEvents: "none" }}>
@@ -225,11 +239,15 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
             const isConn = connectedOutputs.has(i);
             return (
               <g key={`out-${i}`}>
-                <circle cx={node.width + 1} cy={relY} r={5.5}
-                  fill={isConn ? c : "#13131f"} stroke={c} strokeWidth={2}
+                <circle cx={node.width + 1} cy={relY} r={14}
+                  fill="transparent"
                   style={{ cursor: "crosshair" }}
                   onMouseDown={e => { e.stopPropagation(); onPortMouseDown(e, node.id, "output", i, port.type); }}
                   onMouseUp={e => { e.stopPropagation(); onPortMouseUp(e, node.id, "output", i, port.type); }}
+                />
+                <circle cx={node.width + 1} cy={relY} r={5.5}
+                  fill={isConn ? c : "#13131f"} stroke={c} strokeWidth={2}
+                  style={{ pointerEvents: "none" }}
                 />
                 <text x={node.width - 14} y={relY + 4} fontFamily="'Fira Code', monospace"
                   fontSize={10} fill={c} textAnchor="end"
@@ -256,8 +274,9 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
                   {param.type === "select" ? (
                     <select
                       value={node.params[param.key] ?? ""}
-                      onChange={e => e.stopPropagation()}
+                      onChange={e => onParamChange(node.id, param.key, e.target.value)}
                       onClick={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
                       style={{ flex: 1, background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)",
                         borderRadius: 4, color: "#e2e8f0", fontFamily: "'Fira Code', monospace",
                         fontSize: 10, padding: "2px 4px", outline: "none" }}>
@@ -265,19 +284,48 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
                     </select>
                   ) : param.type === "textarea" ? (
                     <textarea rows={2}
-                      defaultValue={node.params[param.key] ?? ""}
+                      value={node.params[param.key] ?? ""}
+                      onChange={e => onParamChange(node.id, param.key, e.target.value)}
                       onClick={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
                       style={{ flex: 1, background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)",
                         borderRadius: 4, color: "#e2e8f0", fontFamily: "'Fira Code', monospace",
                         fontSize: 10, padding: "2px 4px", outline: "none", resize: "none" }} />
                   ) : (
-                    <input type={param.type === "float" || param.type === "int" ? "number" : "text"}
-                      defaultValue={node.params[param.key] ?? ""}
-                      step={param.type === "float" ? 0.1 : 1}
-                      onClick={e => e.stopPropagation()}
-                      style={{ flex: 1, background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 4, color: "#e2e8f0", fontFamily: "'Fira Code', monospace",
-                        fontSize: 10, padding: "2px 4px", outline: "none" }} />
+                    <div style={{ flex: 1, display: "flex", alignItems: "stretch" }}>
+                      <input type={param.type === "float" || param.type === "int" ? "number" : "text"}
+                        value={node.params[param.key] ?? ""}
+                        step={param.type === "float" ? 0.1 : 1}
+                        onChange={e => onParamChange(node.id, param.key, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
+                        style={{ flex: 1, minWidth: 0, background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: param.type === "float" || param.type === "int" ? "4px 0 0 4px" : 4,
+                          color: "#e2e8f0", fontFamily: "'Fira Code', monospace",
+                          fontSize: 10, padding: "2px 4px", outline: "none", MozAppearance: "textfield" }} />
+                      {(param.type === "float" || param.type === "int") && (
+                        <div style={{ display: "flex", flexDirection: "column", width: 14 }}>
+                          {[1, -1].map(dir => (
+                            <button key={dir} type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                const cur = parseFloat(node.params[param.key]) || 0;
+                                const step = param.type === "float" ? 0.1 : 1;
+                                const next = param.type === "float"
+                                  ? Math.round((cur + dir * step) * 10) / 10
+                                  : cur + dir * step;
+                                onParamChange(node.id, param.key, next);
+                              }}
+                              onMouseDown={e => e.stopPropagation()}
+                              style={{ flex: 1, background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)",
+                                borderLeft: "none", borderBottom: dir === 1 ? "none" : undefined,
+                                color: "#64748b", cursor: "pointer", fontSize: 7, lineHeight: 1, padding: 0 }}>
+                              {dir === 1 ? "▲" : "▼"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </foreignObject>
@@ -289,23 +337,28 @@ function GraphNode({ node, selected, wiring, onSelect, onDragStart,
   );
 }
 
+function generateColor(index, total) {
+  const hue = Math.round((index / Math.max(total, 1)) * 360);
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
+
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export default function NodeEditor() {
-  const [nodes, setNodes] = useState(() => {
-    const n1 = makeNode("Load Checkpoint", 60, 80);
-    const n2 = makeNode("CLIP Text Encode", 360, 60);
-    const n3 = makeNode("CLIP Text Encode", 360, 240);
-    const n4 = makeNode("Empty Latent Image", 360, 440);
-    const n5 = makeNode("KSampler", 680, 200);
-    const n6 = makeNode("VAE Decode", 1000, 300);
-    const n7 = makeNode("Save Image", 1260, 320);
-    n3.params.text = "blurry, bad quality, ugly";
-    return [n1, n2, n3, n4, n5, n6, n7];
-  });
+export default function NodeEditor(props) {
+  // const [nodes, setNodes] = useState(() => {
+  //   const n1 = makeNode("Load Checkpoint", 60, 80);
+  //   const n2 = makeNode("CLIP Text Encode", 360, 60);
+  //   const n3 = makeNode("CLIP Text Encode", 360, 240);
+  //   const n4 = makeNode("Empty Latent Image", 360, 440);
+  //   const n5 = makeNode("KSampler", 680, 200);
+  //   const n6 = makeNode("VAE Decode", 1000, 300);
+  //   const n7 = makeNode("Save Image", 1260, 320);
+  //   n3.params.text = "blurry, bad quality, ugly";
+  //   return [n1, n2, n3, n4, n5, n6, n7];
+  // });
 
   const [connections, setConnections] = useState([]);
-
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState([]); // array of selected node ids
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
@@ -314,6 +367,7 @@ export default function NodeEditor() {
   const [contextMenu, setContextMenu] = useState(null); // { x, y }
   const [palette, setPalette] = useState(false);
   const [paletteSearch, setPaletteSearch] = useState("");
+  const [toast, setToast] = useState(null);
   const svgRef = useRef(null);
 
   // Interaction refs (avoid re-renders during drag)
@@ -325,39 +379,114 @@ export default function NodeEditor() {
   useEffect(() => { panRef.current = pan; }, [pan]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   // ── Streamlit lifecycle ──────────────────────────────────────────────────
   const readyRef = useRef(false);
+  const [streamlitArgs, setStreamlitArgs] = useState({
+    node_defs: null,
+    height: 700,
+    initial_nodes: [],
+    initial_connections: [],
+    key: null
+  });
 
   useEffect(() => {
     const onRender = (event) => {
       const args = event.detail.args || {};
+      const newArgs = {
+        node_defs: args.node_defs || {},
+        height: args.height,
+        initial_nodes: args.initial_nodes || [],
+        initial_connections: args.initial_connections || [],
+        key: args.key
+      };
+      // console.log(JSON.stringify(newArgs.node_defs));
+      // console.log(JSON.stringify(NODE_DEFS));
+      setStreamlitArgs(newArgs);
+
+      // ── Resolve which NODE_DEFS to use ──────────────────────────────
+      const incomingDefs = (newArgs.node_defs && Object.keys(newArgs.node_defs).length > 0)
+        ? newArgs.node_defs
+        : NODE_DEFS;
+
+      // Update the global synchronously so makeNode() calls below see it
+      NODE_DEFS = incomingDefs;
+
+      // Update React state so components re-render with new defs
+      setNodeDefs(incomingDefs);
+
+      // ── Build port type color map ────────────────────────────────────
+      const allPortTypes = new Set();
+      Object.values(incomingDefs).forEach(def => {
+        (def.inputs  || []).forEach(i => allPortTypes.add(i.type));
+        (def.outputs || []).forEach(o => allPortTypes.add(o.type));
+      });
+      const typeArray = [...allPortTypes];
+      const portTypeMap = Object.fromEntries(
+        typeArray.map((type, index) => [
+          type,
+          { color: generateColor(index, typeArray.length), label: type }
+        ])
+      );
+      PORT_TYPES = portTypeMap;
+      setPortTypes(portTypeMap);
+
+      // ── Initialize nodes/connections only once ───────────────────────
       if (!readyRef.current) {
-        if (args.initial_nodes && args.initial_nodes.length) {
-          setNodes(args.initial_nodes.map(n => ({
-            ...makeNode(n.type, n.x, n.y),
+        if (newArgs.initial_nodes?.length) {
+          setNodes(newArgs.initial_nodes.map(n => ({
+            ...makeNode(n.type, n.x ?? 0, n.y ?? 0, n.params),
             id: n.id,
-            params: n.params || {},
           })));
+        } else {
+          // Auto-layout nodes from defs if no initial_nodes provided
+          let x_pos = -140;
+          let y_pos = -40;
+          setNodes(Object.entries(incomingDefs).map(([name, def]) => {
+            x_pos += 150;
+            y_pos += 50;
+            return makeNode(name, def.x || x_pos, def.y || y_pos, {});
+          }));
         }
-        if (args.initial_connections && args.initial_connections.length) {
-          setConnections(args.initial_connections);
+
+        if (newArgs.initial_connections?.length) {
+          setConnections(newArgs.initial_connections);
         }
+
         readyRef.current = true;
       }
-      Streamlit.setFrameHeight(args.height || 700);
+
+      Streamlit.setFrameHeight(newArgs.height || 700);
     };
+
     Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
     Streamlit.setComponentReady();
     return () => Streamlit.events.removeEventListener(Streamlit.RENDER_EVENT, onRender);
-  }, []);
+  }, []); // empty deps — register once only
 
+  // console.log("Global Node Defs: " + JSON.stringify(NODE_DEFS))
+
+  const [nodeDefs, setNodeDefs] = useState(NODE_DEFS); // tracks current definitions
+  const [nodes, setNodes] = useState([]); // setNodes is defined here
+  const [portTypes, setPortTypes] = useState([]);
+
+  // debounce so rapid drag/typing updates don't trigger a Streamlit rerun (and dimming) on every frame
+  const commitTimeoutRef = useRef(null);
   useEffect(() => {
-    if (readyRef.current) {
+    if (!readyRef.current) return;
+    if (commitTimeoutRef.current) clearTimeout(commitTimeoutRef.current);
+    commitTimeoutRef.current = setTimeout(() => {
       Streamlit.setComponentValue({
         nodes: nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y, params: n.params })),
         connections,
       });
-    }
+    }, 150);
+    return () => clearTimeout(commitTimeoutRef.current);
   }, [nodes, connections]);
 
   useEffect(() => { Streamlit.setFrameHeight(); });
@@ -392,12 +521,13 @@ export default function NodeEditor() {
         setIsPanning(true);
         panDragRef.current = { startX: e.clientX - panRef.current.x, startY: e.clientY - panRef.current.y };
       }
-      setSelected(null);
+      setSelected([]);
     }
   }, [wiring]);
 
   // ── Mouse move (rAF-throttled) ─────────────────────────────────────────────
   const handleMouseMove = useCallback((e) => {
+    if (dragNodeRef.current || panDragRef.current || wiring) e.preventDefault();
     const cx = e.clientX, cy = e.clientY;
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -441,6 +571,7 @@ export default function NodeEditor() {
 
   // ── Port interactions ──────────────────────────────────────────────────────
   const handlePortMouseDown = useCallback((e, nodeId, side, portIndex, portType) => {
+    e.preventDefault();
     const raw = svgRaw(e);
     setWiring({ fromNode: nodeId, fromPort: portIndex, fromSide: side, fromType: portType });
     setWirePos(raw);
@@ -459,13 +590,33 @@ export default function NodeEditor() {
     const fromPort = isOutputToInput ? wiring.fromPort : portIndex;
     const toNode   = isOutputToInput ? nodeId : wiring.fromNode;
     const toPort   = isOutputToInput ? portIndex : wiring.fromPort;
+    const maxConnections = inputMaxConnections(
+      nodes.find(node => node.id === toNode)?.type,
+      toPort,
+    );
+    setWiring(null);
+
+    if (maxConnections <= 0) {
+      setToast("This input does not accept connections.");
+      return;
+    }
+
+    const inputConnections = connections.filter(c => c.toNode === toNode && c.toPort === toPort);
+    if (inputConnections.length >= maxConnections) {
+      if (maxConnections > 1) {
+        setToast(`This input already has the maximum of ${maxConnections} connections.`);
+        return;
+      }
+      // single-input port: warn before replacing the existing wire
+      const replace = window.confirm("This input already has a connection. Replace it?");
+      if (!replace) return;
+    }
 
     setConnections(cs => [
-      ...cs.filter(c => !(c.toNode === toNode && c.toPort === toPort)), // replace existing input conn
+      ...cs.filter(c => maxConnections > 1 || !(c.toNode === toNode && c.toPort === toPort)),
       { id: `w${Date.now()}`, fromNode, fromPort, toNode, toPort },
     ]);
-    setWiring(null);
-  }, [wiring]);
+  }, [nodes, wiring, connections]);
 
   // ── Context menu (right-click canvas) ────────────────────────────────────
   const handleContextMenu = useCallback((e) => {
@@ -485,18 +636,97 @@ export default function NodeEditor() {
     setPalette(false);
   }, [pan, zoom]);
 
-  // ── Delete selected node ──────────────────────────────────────────────────
+  // ── Update a node's param value ──────────────────────────────────────────
+  const handleParamChange = useCallback((nodeId, key, value) => {
+    setNodes(ns => ns.map(n => n.id === nodeId
+      ? { ...n, params: { ...n.params, [key]: value } }
+      : n
+    ));
+  }, []);
+
+  // ── Delete selected node(s) ───────────────────────────────────────────────
+  const handleDeleteSelected = useCallback(() => {
+    setNodes(ns => ns.filter(n => !selected.includes(n.id)));
+    setConnections(cs => cs.filter(c => !selected.includes(c.fromNode) && !selected.includes(c.toNode)));
+    setSelected([]);
+  }, [selected]);
+
   useEffect(() => {
     const handler = (e) => {
-      if ((e.key === "Delete" || e.key === "Backspace") && selected) {
-        setNodes(ns => ns.filter(n => n.id !== selected));
-        setConnections(cs => cs.filter(c => c.fromNode !== selected && c.toNode !== selected));
-        setSelected(null);
+      if ((e.key === "Delete" || e.key === "Backspace") && selected.length) {
+        handleDeleteSelected();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selected]);
+  }, [selected, handleDeleteSelected]);
+
+  // ── Auto-connect matching ports, left-to-right, skipping cycles ──────────
+  const handleAutoConnect = useCallback(() => {
+    // true if `fromId` can already reach `toId` via existing connections
+    const canReach = (fromId, toId, conns) => {
+      const visited = new Set();
+      const stack = [fromId];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (cur === toId) return true;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        conns.filter(c => c.fromNode === cur).forEach(c => stack.push(c.toNode));
+      }
+      return false;
+    };
+
+    setConnections(cs => {
+      const result = [...cs];
+      const orderedNodes = [...nodes].sort((a, b) => a.x - b.x);
+
+      orderedNodes.forEach(toNodeObj => {
+        const toDef = NODE_DEFS[toNodeObj.type];
+        if (!toDef) return;
+
+        toDef.inputs.forEach((inputPort, toPort) => {
+          const maxConn = inputMaxConnections(toNodeObj.type, toPort);
+
+          // keep adding matching outputs until this input's connection limit is reached
+          for (;;) {
+            const existing = result.filter(c => c.toNode === toNodeObj.id && c.toPort === toPort);
+            if (existing.length >= maxConn) break;
+
+            const fromNodeObj = orderedNodes.find(candidate => {
+              if (candidate.id === toNodeObj.id) return false;
+              const fromDef = NODE_DEFS[candidate.type];
+              if (!fromDef) return false;
+              return fromDef.outputs.some((outputPort, fromPort) =>
+                typesCompatible(outputPort.type, inputPort.type) &&
+                !canReach(toNodeObj.id, candidate.id, result) &&
+                !existing.some(c => c.fromNode === candidate.id && c.fromPort === fromPort)
+              );
+            });
+            if (!fromNodeObj) break;
+
+            const fromDef = NODE_DEFS[fromNodeObj.type];
+            const fromPort = fromDef.outputs.findIndex((outputPort, idx) =>
+              typesCompatible(outputPort.type, inputPort.type) &&
+              !canReach(toNodeObj.id, fromNodeObj.id, result) &&
+              !existing.some(c => c.fromNode === fromNodeObj.id && c.fromPort === idx)
+            );
+            if (fromPort === -1) break;
+
+            result.push({
+              id: `w${Date.now()}_${toNodeObj.id}_${toPort}_${fromNodeObj.id}_${fromPort}`,
+              fromNode: fromNodeObj.id,
+              fromPort,
+              toNode: toNodeObj.id,
+              toPort,
+            });
+          }
+        });
+      });
+
+      return result;
+    });
+  }, [nodes]);
 
   // ── Wire geometry ─────────────────────────────────────────────────────────
   const getWireEndpoints = (conn) => {
@@ -517,7 +747,7 @@ export default function NodeEditor() {
   };
 
   // ── Filtered palette ──────────────────────────────────────────────────────
-  const filteredDefs = Object.entries(NODE_DEFS).filter(([name]) =>
+  const filteredDefs = Object.entries(nodeDefs).filter(([name]) =>
     name.toLowerCase().includes(paletteSearch.toLowerCase())
   );
   const categories = [...new Set(filteredDefs.map(([, d]) => d.category))];
@@ -530,6 +760,9 @@ export default function NodeEditor() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
         select option { background: #0f0f1a; }
+        /* native spinner chrome mis-positions under SVG pan/zoom transforms */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       `}</style>
 
       <div style={{ width: "100vw", height: "100vh", background: "#080810", overflow: "hidden",
@@ -548,13 +781,26 @@ export default function NodeEditor() {
               padding: "3px 10px", cursor: "pointer", fontSize: 10, letterSpacing: "0.05em"
             }}>+ ADD</button>
             <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
+            <button onClick={handleAutoConnect} style={{
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 5, color: "#94a3b8",
+              padding: "3px 10px", cursor: "pointer", fontSize: 10, letterSpacing: "0.05em"
+            }}>AUTO-CONNECT</button>
+            <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
             <span style={{ fontSize: 10, color: "#475569" }}>{Math.round(zoom * 100)}%</span>
             <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); panRef.current = { x: 0, y: 0 }; zoomRef.current = 1; }}
               style={{ background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4,
                 color: "#475569", padding: "2px 6px", cursor: "pointer", fontSize: 9 }}>RESET</button>
+            <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
+            <button onClick={handleDeleteSelected} disabled={!selected.length} style={{
+              background: selected.length ? "rgba(248,113,113,0.15)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${selected.length ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.1)"}`,
+              borderRadius: 5, color: selected.length ? "#f87171" : "#475569",
+              padding: "3px 10px", cursor: selected.length ? "pointer" : "not-allowed",
+              fontSize: 10, letterSpacing: "0.05em"
+            }}>DELETE{selected.length > 1 ? ` (${selected.length})` : ""}</button>
           </div>
         </div>
-
         {/* ── Node palette ──────────────────────────────────────────────── */}
         {palette && (
           <div style={{ position: "absolute", top: 60, left: 20, width: 220,
@@ -588,6 +834,16 @@ export default function NodeEditor() {
           </div>
         )}
 
+        {/* ── Toast notification ───────────────────────────────────────── */}
+        {toast && (
+          <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)",
+            background: "rgba(127,29,29,0.95)", border: "1px solid rgba(248,113,113,0.4)",
+            borderRadius: 8, padding: "8px 16px", zIndex: 400, color: "#fecaca", fontSize: 11,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+            {toast}
+          </div>
+        )}
+
         {/* ── Port type legend ──────────────────────────────────────────── */}
         <div style={{ position: "absolute", bottom: 16, left: 16, zIndex: 100,
           background: "rgba(13,13,25,0.9)", border: "1px solid rgba(255,255,255,0.07)",
@@ -610,7 +866,7 @@ export default function NodeEditor() {
             <div style={{ padding: "6px 12px 4px", fontSize: 9, color: "#475569", letterSpacing: "0.15em" }}>
               ADD NODE
             </div>
-            {Object.entries(NODE_DEFS).map(([name, def]) => (
+            {Object.entries(nodeDefs).map(([name, def]) => (
               <div key={name}
                 onClick={() => addNode(name, contextMenu.svgX, contextMenu.svgY)}
                 style={{ padding: "6px 14px", cursor: "pointer", fontSize: 11, color: "#cbd5e1",
@@ -657,21 +913,26 @@ export default function NodeEditor() {
                   d={wirePath(pts.from.x, pts.from.y, pts.to.x, pts.to.y)}
                   fill="none" stroke={color} strokeWidth={2.5} strokeOpacity={0.85}
                   style={{ cursor: "pointer" }}
-                  onClick={e => { e.stopPropagation(); setConnections(cs => cs.filter(c => c.id !== conn.id)); }}
-                />
+                  onClick={e => { e.stopPropagation(); setConnections(cs => cs.filter(c => c.id !== conn.id)); }}>
+                  <title>Click to remove</title>
+                </path>
               );
             })}
 
             {/* Nodes */}
             {nodes.map(node => (
               <GraphNode key={node.id} node={node}
-                selected={selected === node.id}
+                selected={selected.includes(node.id)}
                 wiring={wiring}
                 connections={connections}
-                onSelect={setSelected}
+                onSelect={(id, additive) => setSelected(sel => additive
+                  ? (sel.includes(id) ? sel.filter(s => s !== id) : [...sel, id])
+                  : [id]
+                )}
                 onDragStart={handleNodeDragStart}
                 onPortMouseDown={handlePortMouseDown}
                 onPortMouseUp={handlePortMouseUp}
+                onParamChange={handleParamChange}
               />
             ))}
           </g>

@@ -1,0 +1,17 @@
+[browser]
+    gatherUsageStats = false
+
+[theme]
+    base="light"
+
+[client]
+    toolbarMode = "developer"
+    showErrorDetails = "full"
+
+[server]
+    address="0.0.0.0"
+    port=8501
+    enableCORS=false
+    enableXsrfProtection=false
+    enableWebsocketCompression=false
+    

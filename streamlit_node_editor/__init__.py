@@ -1,7 +1,7 @@
 import os
 import streamlit.components.v1 as components
 
-_RELEASE = True
+_RELEASE = False
 
 if _RELEASE:
     _component_func = components.declare_component(
@@ -11,10 +11,16 @@ if _RELEASE:
 else:
     _component_func = components.declare_component(
         "streamlit_node_editor",
-        url="http://localhost:3001",
+        url="http://localhost:3000",
+        # path="/",
+        # url="https://vscode.datacache.uk/proxy/3001/",
     )
 
-
+# Create a wrapper function for the component. This is an optional
+# best practice - we could simply expose the component function returned by
+# `declare_component` and call it done. The wrapper allows us to customize
+# our component's API: we can pre-process its input args, post-process its
+# output value, and add a docstring for users.
 def st_node_editor(node_defs, initial_nodes=None, initial_connections=None,
                    height=700, key=None):
     """
@@ -32,7 +38,11 @@ def st_node_editor(node_defs, initial_nodes=None, initial_connections=None,
                 "category": str,          # groups nodes in the palette
                 "headerColor": str,       # hex color for the node header bar
                 "inputs": [               # list of input port definitions
-                    {"name": str, "type": str},   # type must be a key in port_types
+                    {
+                        "name": str,
+                        "type": str,     # type must be a key in port_types
+                        "maxConnections": int,  # optional; defaults to 1
+                    },
                 ],
                 "outputs": [              # list of output port definitions
                     {"name": str, "type": str},
